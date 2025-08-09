@@ -587,7 +587,43 @@ class IssueViewSet(BaseViewSet):
     @allow_permission(
         allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue
     )
+    def update(self, request, slug, project_id, pk=None):
+        if request.data.get("state", None):
+            issue = Issue.objects.get(pk=pk)
+            if issue.issue_cycle.exists():
+                cycle_issue = issue.issue_cycle.first()
+                if (
+                    cycle_issue.cycle.end_date
+                    and cycle_issue.cycle.end_date < timezone.now()
+                ):
+                    return Response(
+                        {
+                            "error": "You cannot change the status of an issue in a cycle that has ended."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        return super().update(request, slug, project_id, pk)
+
     def partial_update(self, request, slug, project_id, pk=None):
+        if request.data.get("state", None):
+            issue = Issue.objects.get(pk=pk)
+            if issue.issue_cycle.exists():
+                cycle_issue = issue.issue_cycle.first()
+                if (
+                    cycle_issue.cycle.end_date
+                    and cycle_issue.cycle.end_date < timezone.now()
+                ):
+                    return Response(
+                        {
+                            "error": "You cannot change the status of an issue in a cycle that has ended."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        return super().partial_update(request, slug, project_id, pk)
+
+    def partial_update_old(self, request, slug, project_id, pk=None):
         issue = (
             self.get_queryset()
             .annotate(
@@ -1333,3 +1369,5 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
         # Serialize the issue
         serializer = IssueDetailSerializer(issue, expand=self.expand)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
